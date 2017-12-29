@@ -1,1 +1,1 @@
-# fluentd2kibana
+# github.com/reymont/fluentd2kibana
