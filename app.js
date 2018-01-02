@@ -16,7 +16,7 @@ app.use(bodyParser.urlencoded({
 
 app.get('/', (req, res) => res.send('Hello World!'))
 
-app.post('/kibana', (req, res) => {
+app.get('/kibana', (req, res) => {
     let body = {
         "query": {
             "match_all": {}
@@ -37,23 +37,27 @@ app.post('/kibana', (req, res) => {
             }
         }
     };
+
+    let jsonResult = new Array();
+
     client.search({
             index: 'logstash-*',
-            type: 'jtp_java_log',
+            type: req.query.type,
             body: body
         }).then(results => {
             console.log(`found ${results.hits.total} items in ${results.took}ms`);
             console.log(`aggregations values.`);
-
-            let jsonResult = new Array();
+            
             results.aggregations.hostnames.buckets.forEach((hit_hostname, index = index++) => {
                 client.search({
                     index: '.kibana',
                     type: 'index-pattern'
                 }).then(function (results) {
                     //console.log(JSON.stringify(results, null, 4));
+                    // 获取默认的kibana id
                     let searchId = results.hits.hits[0]._id;
 
+                    // 以主机ip为主键
                     let searchJson = {
                         index: searchId,
                         highlightAll: true,
@@ -84,6 +88,7 @@ app.post('/kibana', (req, res) => {
 
                     var data = new Array();
                     hit_hostname.micro_service.buckets.forEach((hit_micro_service, index = index++) => {
+                        // 默认屏蔽micro_service查询条件
                         searchJson.filter[searchJson.filter.length] = {
                             meta: {
                                 alias: hit_micro_service.key,
@@ -127,6 +132,7 @@ app.post('/kibana', (req, res) => {
                     }).then(function (results) {
                         var hits = results.hits.hits;
                         // console.log(JSON.stringify(hits, null, 4));
+                        // 判断是否存在过滤器
                         if (hits && hits.length > 0 && hits[0]._id) {
                             client.index({
                                 index: ".kibana",
@@ -149,7 +155,8 @@ app.post('/kibana', (req, res) => {
 
                             });
                             //console.log(JSON.stringify(jsonResult[index]));
-                        }else{
+                        } else {
+                            // add new index
                             client.index({
                                 index: ".kibana",
                                 type: "search",
@@ -173,164 +180,12 @@ app.post('/kibana', (req, res) => {
                     })
                 });
             });
-            res.json({
-                data: jsonResult
-            });
+
         })
         .catch(console.error);
+    res.json({
+        data: "Done"
+    });
 });
-
-app.get('/kibana', (req, res) => {
-    client.search({
-        index: '.kibana',
-        type: 'search',
-        body: {
-            query: {
-                term: {
-                    title: req.query.hostname || ""
-                }
-            }
-        }
-    }).then(function (results) {
-        var hits = results.hits.hits;
-        console.log(JSON.stringify(hits, null, 4));
-        if (hits && hits.length > 0 && hits[0]._id) {
-            res.send(hits[0]._id);
-        } else {
-            res.send("None Id!");
-        }
-    }, function (err) {
-        console.trace(err.message);
-    });
-})
-
-// POST method create new index
-app.post('/kibana', function (req, res) {
-    client.search({
-        index: '.kibana',
-        type: 'index-pattern'
-    }).then(function (results) {
-        //console.log(JSON.stringify(results, null, 4));
-        let searchId = results.hits.hits[0]._id;
-        let searchJson = {
-            index: searchId,
-            highlightAll: true,
-            version: true,
-            query: {
-                match_all: {}
-            },
-            filter: [{
-                meta: {
-                    alias: req.body.hostname,
-                    disabled: false,
-                    index: searchId,
-                    key: "hostname",
-                    negate: false,
-                    type: "phrase",
-                    value: req.body.hostname
-                },
-                query: {
-                    match: {
-                        hostname: {
-                            query: req.body.hostname,
-                            type: "phrase"
-                        }
-                    }
-                }
-            }]
-        };
-
-
-        if (req.body.micro_service) {
-            searchJson.filter[searchJson.filter.length] = {
-                meta: {
-                    alias: req.body.micro_service,
-                    disabled: false,
-                    index: searchId,
-                    key: "micro_service",
-                    negate: false,
-                    type: "phrase",
-                    value: req.body.micro_service
-                },
-                query: {
-                    match: {
-                        micro_service: {
-                            query: req.body.micro_service,
-                            type: "phrase"
-                        }
-                    }
-                }
-            }
-        }
-
-        client.search({
-            index: '.kibana',
-            type: 'search',
-            body: {
-                query: {
-                    term: {
-                        title: req.body.hostname || ""
-                    }
-                }
-            }
-        }).then(function (results) {
-            var hits = results.hits.hits;
-            // console.log(JSON.stringify(hits, null, 4));
-            // console.log("----------------------------------------");
-            // console.log(hits[0]._source.kibanaSavedObjectMeta.searchSourceJSON)
-            if (hits && hits.length > 0 && hits[0]._id) {
-                client.index({
-                    index: ".kibana",
-                    type: "search",
-                    id: hits[0]._id, //update the index
-                    body: {
-                        "title": req.body.hostname,
-                        "columns": [
-                            "msg"
-                        ],
-                        "sort": [
-                            "@timestamp",
-                            "desc"
-                        ],
-                        "kibanaSavedObjectMeta": {
-                            "searchSourceJSON": hits[0]._source.kibanaSavedObjectMeta.searchSourceJSON +
-                                JSON.stringify(searchJson, null, 4)
-                        }
-                    }
-                }, function (error, response) {
-
-                });
-                res.send(hits[0]._id);
-            } else {
-                client.index({
-                    index: ".kibana",
-                    type: "search",
-                    body: {
-                        "title": req.body.hostname,
-                        "columns": [
-                            "msg"
-                        ],
-                        "sort": [
-                            "@timestamp",
-                            "desc"
-                        ],
-                        "kibanaSavedObjectMeta": {
-                            "searchSourceJSON": JSON.stringify(searchJson, null, 4)
-                        }
-                    }
-                }, function (error, response) {
-
-                });
-                res.send("None id!");
-            }
-        }, function (err) {
-            console.trace(err.message);
-        });
-
-
-    }, function (err) {
-        console.trace(err.message);
-    });
-})
 
 app.listen(3000, () => console.log('Example app listening on port 3000!'))
