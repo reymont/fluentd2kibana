@@ -18,6 +18,7 @@
   "homepage": "https://github.com/reymont/fluentd2kibana#readme",
   "dependencies": {
     "elasticsearch": "^14.0.0",
-    "express": "^4.16.2"
+    "express": "^4.16.2",
+    "node-schedule": "^1.2.5"
   }
 }

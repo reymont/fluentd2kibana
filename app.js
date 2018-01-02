@@ -1,6 +1,7 @@
 const express = require('express')
 const app = express()
 const elasticsearch = require('elasticsearch');
+const schedule = require('node-schedule');
 const client = new elasticsearch.Client({
     //host: '192.168.99.100:9200',
     host: '172.20.62.42:9200',
@@ -17,6 +18,18 @@ app.use(bodyParser.urlencoded({
 app.get('/', (req, res) => res.send('Hello World!'))
 
 app.get('/kibana', (req, res) => {
+    updateKibanaSearch(req.query.type);
+    res.json({
+        data: "Done"
+    });
+});
+
+schedule.scheduleJob('*/5 * * * * *', function () {
+    updateKibanaSearch();
+    console.log('Update kibana search filter!');
+});
+
+function updateKibanaSearch(searchType) {
     let body = {
         "query": {
             "match_all": {}
@@ -42,12 +55,12 @@ app.get('/kibana', (req, res) => {
 
     client.search({
             index: 'logstash-*',
-            type: req.query.type,
+            type: searchType || "jtp_java_log",
             body: body
         }).then(results => {
             console.log(`found ${results.hits.total} items in ${results.took}ms`);
             console.log(`aggregations values.`);
-            
+
             results.aggregations.hostnames.buckets.forEach((hit_hostname, index = index++) => {
                 client.search({
                     index: '.kibana',
@@ -183,9 +196,6 @@ app.get('/kibana', (req, res) => {
 
         })
         .catch(console.error);
-    res.json({
-        data: "Done"
-    });
-});
+}
 
 app.listen(3000, () => console.log('Example app listening on port 3000!'))
