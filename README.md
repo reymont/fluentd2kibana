@@ -22,13 +22,20 @@ Docker Support
 git clone https://github.com/reymont/fluentd2kibana.git
 rm -rf .git 
 docker-machine start
+# docker-machine regenerate-certs
+# linux
 eval $(docker-machine env)
+# windows
+# @FOR /f "tokens=*" %i IN ('docker-machine env') DO @%i
 cd fluentd2kibana
 docker pull registry.alauda.cn/library/node
 # Build your docker
 docker build -t f2b .
 # run your docker
-docker run -p 3000:3000 f2b
+docker run --rm -p 3000:3000 f2b
+# windows node version
+# winpty docker run --rm -it -p 3000:3000 f2b sh
+node -v
 ```
 
 

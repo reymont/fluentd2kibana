@@ -1,10 +1,10 @@
+const config = require('./config.json');
 const express = require('express')
 const app = express()
 const elasticsearch = require('elasticsearch');
 const schedule = require('node-schedule');
 const client = new elasticsearch.Client({
-    //host: '192.168.99.100:9200',
-    host: '172.20.62.42:9200',
+    host: config.eshost||'192.168.99.100:9200',
     log: 'error'
     //log: 'trace'
 });
@@ -24,9 +24,10 @@ app.get('/kibana', (req, res) => {
     });
 });
 
-schedule.scheduleJob('*/5 * * * * *', function () {
+schedule.scheduleJob(config.schedule, function () {
+    // console.log(JSON.stringify(config, null, 4));
     updateKibanaSearch();
-    console.log('Update kibana search filter!');
+    console.log(new Date()+' Update kibana search filter!');
 });
 
 function updateKibanaSearch(searchType) {
@@ -198,4 +199,4 @@ function updateKibanaSearch(searchType) {
         .catch(console.error);
 }
 
-app.listen(3000, () => console.log('Example app listening on port 3000!'))
+app.listen(config.port||3000, () => console.log('Example app listening on port '+config.port+'!'))
