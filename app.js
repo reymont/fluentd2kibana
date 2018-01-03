@@ -38,7 +38,8 @@ function updateKibanaSearch(searchType) {
         "aggs": {
             "hostnames": {
                 "terms": {
-                    "field": "hostname.keyword"
+                    "field": "hostname.keyword",
+                    size: 100
                 },
 
                 "aggs": {
@@ -155,7 +156,8 @@ function updateKibanaSearch(searchType) {
                                 body: {
                                     "title": hit_hostname.key,
                                     "columns": [
-                                        "msg"
+                                        "msg",
+                                        "log"
                                     ],
                                     "sort": [
                                         "@timestamp",
